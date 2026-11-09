@@ -1,0 +1,1009 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpeedRunner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root { --ink:#0a0a0a; --paper:#ffffff; --mute:#8a8a8a; --line:#e6e6e6; --gold:#c9a227; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { width:100%; height:100%; overflow:hidden; background:var(--paper); color:var(--ink);
+    font-family:'Archivo', system-ui, -apple-system, sans-serif; -webkit-font-smoothing:antialiased; }
+  canvas#game { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  .screen { position:fixed; inset:0; display:none; align-items:center; justify-content:center; padding:24px; }
+  .screen.on { display:flex; }
+  .scrim { background:rgba(255,255,255,.86); backdrop-filter:blur(3px); }
+  .panel { width:min(640px,100%); }
+  .title { font-weight:900; font-size:clamp(48px,10vw,120px); letter-spacing:-.04em; line-height:.9; }
+  .sub { font-style:italic; color:var(--mute); margin-top:14px; font-size:18px; letter-spacing:.01em; }
+  .menu { margin-top:44px; display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
+  .btn { background:none; border:none; font:inherit; color:var(--ink); cursor:pointer; font-weight:800;
+    font-size:26px; letter-spacing:.06em; padding:4px 0; position:relative; text-align:left; }
+  .btn::after { content:''; position:absolute; left:0; bottom:2px; height:3px; width:0; background:var(--ink); transition:width .18s ease; }
+  .btn:hover::after, .btn:focus-visible::after { width:100%; }
+  .btn:focus-visible { outline:none; }
+  .btn[disabled] { color:#c4c4c4; cursor:default; }
+  .btn[disabled]::after { display:none; }
+  .btn.small { font-size:16px; }
+  .row { display:flex; gap:28px; flex-wrap:wrap; align-items:center; margin-top:28px; }
+  .who { position:fixed; top:22px; right:28px; font-weight:600; font-size:14px; letter-spacing:.08em; color:var(--mute); }
+  .who b { color:var(--ink); }
+  h2 { font-weight:900; font-size:44px; letter-spacing:-.02em; }
+  .label { font-size:12px; letter-spacing:.16em; color:var(--mute); font-weight:600; text-transform:uppercase; }
+  input[type=text] { font:inherit; font-size:28px; font-weight:800; border:none; border-bottom:3px solid var(--ink);
+    padding:6px 0; width:100%; outline:none; background:transparent; letter-spacing:.02em; }
+  .err { color:#b00; font-size:14px; min-height:20px; margin-top:8px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; margin-top:24px; }
+  .card { border:2px solid var(--ink); padding:16px; cursor:pointer; transition:transform .12s, background .12s; background:var(--paper); }
+  .card:hover { transform:translateY(-2px); }
+  .card.locked { border-color:var(--line); color:#bbb; cursor:default; }
+  .card.locked:hover { transform:none; }
+  .card .n { font-size:12px; letter-spacing:.14em; font-weight:600; }
+  .card .t { font-size:20px; font-weight:900; margin:4px 0 12px; }
+  .card .s { font-family:'JetBrains Mono',monospace; font-size:13px; line-height:1.6; }
+  table { width:100%; border-collapse:collapse; margin-top:18px; font-family:'JetBrains Mono',monospace; font-size:16px; }
+  td,th { padding:8px 6px; text-align:left; border-bottom:1px solid var(--line); }
+  th { font-family:'Archivo',sans-serif; font-size:12px; letter-spacing:.14em; color:var(--mute); font-weight:600; }
+  tr.me td { font-weight:700; background:#f3f3f3; }
+  tr.wr td:first-child::after { content:' ★'; color:var(--gold); }
+  .tag { display:inline-block; font-size:11px; letter-spacing:.14em; border:1.5px solid var(--ink); padding:3px 8px; font-weight:700; margin-top:10px; }
+  .big { font-family:'JetBrains Mono',monospace; font-weight:700; font-size:clamp(56px,11vw,112px); letter-spacing:-.03em; line-height:1; }
+  .gold { color:var(--gold); }
+  .stats { font-family:'JetBrains Mono',monospace; font-size:16px; line-height:1.9; margin-top:18px; }
+  .cust { display:grid; grid-template-columns:1fr 1fr; gap:28px; align-items:center; margin-top:20px; }
+  .cust canvas { width:100%; aspect-ratio:1; border:2px solid var(--ink); }
+  .pick { margin-bottom:22px; }
+  .pick .ctl { display:flex; gap:10px; align-items:center; margin-top:8px; }
+  input[type=color] { width:52px; height:40px; border:2px solid var(--ink); padding:2px; background:var(--paper); cursor:pointer; }
+  .pick input[type=text] { font-size:18px; width:130px; font-family:'JetBrains Mono',monospace; border-bottom-width:2px; }
+  .keys { margin-top:22px; font-size:14px; color:var(--mute); line-height:1.8; }
+  kbd { font-family:'JetBrains Mono',monospace; border:1.5px solid #bbb; border-bottom-width:3px; padding:1px 7px; font-size:12px; color:var(--ink); border-radius:4px; }
+  .mobile-note { display:none; margin-top:20px; font-size:14px; color:#b00; }
+  @media (hover:none) and (pointer:coarse) { .mobile-note { display:block; } }
+  @media (max-width:600px) { .cust { grid-template-columns:1fr; } .btn { font-size:22px; } }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- USERNAME -->
+<div class="screen scrim" id="s-name">
+  <div class="panel">
+    <div class="title" style="font-size:clamp(40px,8vw,84px)">SPEEDRUNNER</div>
+    <p class="sub">Every millisecond counts.</p>
+    <div style="margin-top:48px" class="label">Choose your username</div>
+    <input type="text" id="name-input" maxlength="16" autocomplete="off" spellcheck="false" placeholder="ronin_01">
+    <div class="err" id="name-err"></div>
+    <div class="row"><button class="btn" id="name-ok">CONTINUE →</button></div>
+  </div>
+</div>
+
+<!-- MAIN MENU -->
+<div class="screen scrim" id="s-menu">
+  <div class="who">RUNNER <b id="who-name"></b></div>
+  <div class="panel">
+    <div class="title">SPEEDRUNNER</div>
+    <p class="sub">Every millisecond counts.</p>
+    <div class="menu">
+      <button class="btn" data-go="play">PLAY</button>
+      <button class="btn" data-go="maps">MAPS</button>
+      <button class="btn" data-go="board">LEADERBOARDS</button>
+      <button class="btn" data-go="cust">CUSTOMIZE</button>
+      <button class="btn" data-go="profile">PROFILE</button>
+      <button class="btn" data-go="settings">SETTINGS</button>
+    </div>
+    <div class="keys"><kbd>A</kbd><kbd>D</kbd> run &nbsp; <kbd>Space</kbd> jump (hold = higher) &nbsp; <kbd>R</kbd> restart &nbsp; <kbd>Esc</kbd> pause</div>
+    <div class="mobile-note">SpeedRunner needs a keyboard. Play it on a computer.</div>
+  </div>
+</div>
+
+<!-- MAPS -->
+<div class="screen scrim" id="s-maps">
+  <div class="panel" style="width:min(900px,100%)">
+    <h2>MAPS</h2>
+    <div class="cards" id="map-cards"></div>
+    <div class="row"><button class="btn small" data-go="menu">← BACK</button></div>
+  </div>
+</div>
+
+<!-- LEADERBOARD -->
+<div class="screen scrim" id="s-board">
+  <div class="panel">
+    <h2 id="board-title">FIRST STEPS</h2>
+    <div class="tag">LOCAL MODE · this device only</div>
+    <table><thead><tr><th>RANK</th><th>USERNAME</th><th>BEST TIME</th></tr></thead><tbody id="board-body"></tbody></table>
+    <div class="stats" id="board-me"></div>
+    <div class="row"><button class="btn small" data-go="back">← BACK</button><button class="btn small" data-go="play">PLAY MAP →</button></div>
+  </div>
+</div>
+
+<!-- CUSTOMIZE -->
+<div class="screen scrim" id="s-cust">
+  <div class="panel" style="width:min(760px,100%)">
+    <h2>CUSTOMIZE</h2>
+    <div class="cust">
+      <canvas id="preview" width="420" height="420"></canvas>
+      <div>
+        <div class="pick"><div class="label">Kasa · hat</div>
+          <div class="ctl"><input type="color" id="c-hat"><input type="text" id="t-hat" maxlength="7"></div></div>
+        <div class="pick"><div class="label">Kimono</div>
+          <div class="ctl"><input type="color" id="c-kim"><input type="text" id="t-kim" maxlength="7"></div></div>
+        <button class="btn small" id="c-reset">RESET TO DEFAULTS</button>
+      </div>
+    </div>
+    <div class="row"><button class="btn small" data-go="menu">← DONE</button></div>
+  </div>
+</div>
+
+<!-- PROFILE -->
+<div class="screen scrim" id="s-profile">
+  <div class="panel">
+    <h2>PROFILE</h2>
+    <div class="label" style="margin-top:20px">Username</div>
+    <input type="text" id="prof-name" maxlength="16" autocomplete="off" spellcheck="false">
+    <div class="err" id="prof-err"></div>
+    <div class="stats" id="prof-stats"></div>
+    <div class="row"><button class="btn small" id="prof-save">SAVE</button><button class="btn small" data-go="menu">← BACK</button></div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="screen scrim" id="s-settings">
+  <div class="panel">
+    <h2>SETTINGS</h2>
+    <div class="menu">
+      <button class="btn" id="set-sound">SOUND: ON</button>
+      <button class="btn" id="set-reset">RESET MY RECORDS</button>
+    </div>
+    <div class="row"><button class="btn small" data-go="back">← BACK</button></div>
+  </div>
+</div>
+
+<!-- PAUSE -->
+<div class="screen scrim" id="s-pause">
+  <div class="panel">
+    <h2>PAUSED</h2>
+    <div class="menu">
+      <button class="btn" data-go="resume">RESUME</button>
+      <button class="btn" data-go="restart">RESTART</button>
+      <button class="btn" data-go="settings">SETTINGS</button>
+      <button class="btn" data-go="maps">RETURN TO MAPS</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESULTS -->
+<div class="screen scrim" id="s-result">
+  <div class="panel">
+    <div class="label" id="res-map">FIRST STEPS · FINISHED</div>
+    <div class="big" id="res-time">00:00.000</div>
+    <div class="label" id="res-flag" style="margin-top:12px;font-size:14px"></div>
+    <div class="stats" id="res-stats"></div>
+    <div class="row">
+      <button class="btn" data-go="restart">RETRY <span style="font-size:14px;color:var(--mute)">[R]</span></button>
+      <button class="btn" disabled>NEXT MAP</button>
+      <button class="btn small" data-go="board">LEADERBOARD</button>
+      <button class="btn small" data-go="maps">MAPS</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =========================================================================
+   SPEEDRUNNER — single-file build (v0.1: Map 1 + full movement kit)
+   Sections: config · storage · input · audio · map · player · animation ·
+             particles · camera · render · game flow · UI
+   ========================================================================= */
+
+// ---------- CONFIG ----------------------------------------------------------
+const VIEW_W = 1280, VIEW_H = 720;
+const ZOOM = 1.32, VW = VIEW_W / ZOOM, VH = VIEW_H / ZOOM;   // world units visible on screen
+const DT = 1 / 120;                       // fixed physics step
+const PHYS = {
+  maxRun: 420, groundAccel: 2700, turnAccel: 5200, groundFric: 3000, overspeedDecay: 500,
+  airAccel: 1900, airDrag: 160,
+  gravity: 2500, fallMult: 1.65, apexMult: 0.55, apexBand: 90, maxFall: 1150,
+  jumpVel: 830, jumpCut: 0.45, coyote: 0.10, buffer: 0.13,
+  wallSlideMax: 115, wallStick: 0.10, wallCoyote: 0.08,
+  wallJumpX: 440, wallJumpY: 790, wallJumpSameY: 330, wallLock: 0.15,
+  rollFall: 230, rollTime: 0.42, rollMinSpeed: 280,
+  flipTime: 0.46, flipMinSpeed: 250,
+};
+const P_W = 20, P_H = 46;
+const DEFAULT_HAT = '#111111', DEFAULT_KIM = '#d0281f';
+
+// ---------- STORAGE (local dev mode) ---------------------------------------
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+const MOCK_NAMES = ['ShadowRunner', 'KuroSpeed', 'NinjaZero', 'Hayabusa', 'InkDash'];
+const MOCK_BOARD = { m1: [
+  { name: 'ShadowRunner', time: 13842 }, { name: 'KuroSpeed', time: 14395 },
+  { name: 'NinjaZero', time: 15118 }, { name: 'Hayabusa', time: 16904 }, { name: 'InkDash', time: 19477 },
+]};
+let profile = store.get('sr_profile', null);
+function saveProfile() { store.set('sr_profile', profile); }
+function boardFor(mapId) {
+  const local = store.get('sr_lb_' + mapId, []);
+  const all = [...(MOCK_BOARD[mapId] || []), ...local];
+  const best = new Map();
+  for (const e of all) if (!best.has(e.name) || best.get(e.name) > e.time) best.set(e.name, e.time);
+  return [...best].map(([name, time]) => ({ name, time })).sort((a, b) => a.time - b.time);
+}
+function submitRun(mapId, name, time) {
+  const local = store.get('sr_lb_' + mapId, []);
+  const i = local.findIndex(e => e.name === name);
+  if (i < 0) local.push({ name, time }); else if (time < local[i].time) local[i].time = time;
+  store.set('sr_lb_' + mapId, local);
+}
+const fmt = ms => {
+  if (ms == null) return '--:--.---';
+  ms = Math.max(0, Math.floor(ms));
+  const m = Math.floor(ms / 60000), s = Math.floor(ms / 1000) % 60, r = ms % 1000;
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0') + '.' + String(r).padStart(3, '0');
+};
+const validName = n => /^[A-Za-z0-9_]{3,16}$/.test(n);
+
+// ---------- INPUT -----------------------------------------------------------
+const keys = {}; let jumpPressed = false;
+const K_LEFT = ['KeyA', 'ArrowLeft'], K_RIGHT = ['KeyD', 'ArrowRight'], K_JUMP = ['Space', 'KeyW', 'ArrowUp'];
+const down = list => list.some(k => keys[k]);
+addEventListener('keydown', e => {
+  if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+  if ([...K_JUMP, ...K_LEFT, ...K_RIGHT].includes(e.code)) e.preventDefault();
+  if (K_JUMP.includes(e.code) && !e.repeat) jumpPressed = true;
+  keys[e.code] = true;
+  onKey(e);
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; if (game.mode === 'run') pause(); });
+
+// ---------- AUDIO -----------------------------------------------------------
+let actx = null;
+function sfx(type) {
+  if (!profile || profile.mute) return;
+  try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
+  const t = actx.currentTime;
+  const tone = (f1, f2, dur, vol, wave = 'triangle', delay = 0) => {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = wave; o.frequency.setValueAtTime(f1, t + delay);
+    o.frequency.exponentialRampToValueAtTime(f2, t + delay + dur);
+    g.gain.setValueAtTime(vol, t + delay); g.gain.exponentialRampToValueAtTime(0.0001, t + delay + dur);
+    o.connect(g).connect(actx.destination); o.start(t + delay); o.stop(t + delay + dur + 0.02);
+  };
+  const noise = (dur, vol, freq) => {
+    const b = actx.createBuffer(1, actx.sampleRate * dur, actx.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+    const s = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+    f.type = 'lowpass'; f.frequency.value = freq; g.gain.value = vol;
+    s.buffer = b; s.connect(f).connect(g).connect(actx.destination); s.start(t);
+  };
+  switch (type) {
+    case 'jump': tone(420, 760, 0.09, 0.07); break;
+    case 'wall': tone(520, 980, 0.1, 0.08, 'square'); noise(0.06, 0.12, 2400); break;
+    case 'land': noise(0.08, 0.18, 700); break;
+    case 'roll': noise(0.22, 0.14, 900); break;
+    case 'beep': tone(660, 660, 0.12, 0.08, 'sine'); break;
+    case 'go': tone(990, 990, 0.25, 0.09, 'sine'); break;
+    case 'die': tone(300, 70, 0.3, 0.09, 'sawtooth'); break;
+    case 'check': tone(880, 1320, 0.12, 0.05, 'sine'); break;
+    case 'finish': [523, 659, 784, 1046].forEach((f, i) => tone(f, f, 0.22, 0.08, 'triangle', i * 0.08)); break;
+  }
+}
+
+// ---------- MAP 1 · FIRST STEPS --------------------------------------------
+// Solids: [x, y, w, h]  (ground top = 600). Data-driven so more maps slot in later.
+const G = 600;
+const MAPS = [
+  {
+    id: 'm1', name: 'FIRST STEPS', difficulty: 'Easy', width: 6200, top: -320, deathY: 650,
+    start: { x: 120, y: G },
+    solids: [
+      [0, G, 980, 500],                      // A · start ground
+      [520, G - 34, 46, 34, 'bush'],         // bush
+      [760, G - 46, 64, 46, 'bush'],
+      // gap 980 → 1120
+      [1120, G, 760, 500],                   // B · steps
+      [1300, G - 60, 140, 60],
+      [1440, G - 120, 140, 120],
+      [1580, G - 60, 120, 60],
+      // momentum gap 1880 → 2060
+      [2060, G, 630, 500],                   // C · chimney floor
+      [2400, 250, 44, 220],                  // hanging left wall (walk under it)
+      [2594, 330, 420, 800],                 // right wall + plateau
+      // plateau → high drop at 3014
+      [3014, G, 760, 500],                   // D · landing + bushes
+      [3330, G - 40, 56, 40, 'bush'],
+      [3560, G - 30, 40, 30, 'bush'],
+      // narrow platforms over the void 3774 → 4470
+      [3900, 548, 96, 18],
+      [4090, 488, 84, 18],
+      [4280, 548, 96, 18],
+      [4470, G, 1730, 500],                  // E · final stretch
+      [5060, G - 70, 80, 70],
+      [5140, G - 130, 260, 130],             // ledge with a small drop after
+    ],
+    spikes: [ [4780, G, 120], [5560, G, 100] ],  // [x, groundY, width]
+    checkpoints: [2120, 3040, 4500],
+    finish: { x: 5880 },
+  },
+];
+const LOCKED_MAPS = [
+  { n: 2, name: 'MOMENTUM', difficulty: 'Medium' }, { n: 3, name: 'VERTICAL ESCAPE', difficulty: 'Medium' },
+  { n: 4, name: 'FLOW STATE', difficulty: 'Hard' }, { n: 5, name: 'SAMURAI TRIAL', difficulty: 'Expert' },
+];
+
+// ---------- GAME STATE ------------------------------------------------------
+const game = {
+  mode: 'menu',        // menu | countdown | run | dead | finished | paused
+  map: MAPS[0], time: 0, countdown: 0, deadT: 0, finishT: 0, lastBeep: 4,
+  checkpoint: null, prevMode: null, resultShown: false, returnTo: 'menu',
+};
+const P = {};
+function resetPlayer(x, y) {
+  Object.assign(P, {
+    x: x - P_W / 2, y: y - P_H, vx: 0, vy: 0, px: x - P_W / 2, py: y - P_H,
+    onGround: true, coyote: 0, buffer: 0, jumpCut: true, fromGround: false, holdT: 0,
+    wallDir: 0, wallMem: 0, wallMemT: 0, wallStickT: 0, wasWall: false, wallLock: 0, lastWJ: 0,
+    facing: 1, airT: 0, peak: y, flip: 0, flipOn: false, flipPending: false, flipDir: 1,
+    roll: 0, land: 0, stretch: 0, phase: 0, dustT: 0, flap: 0, flapV: 0, dead: false,
+  });
+  pose = poseIdle(0);
+}
+
+// ---------- COLLISION -------------------------------------------------------
+const overlap = (ax, ay, aw, ah, b) => ax < b[0] + b[2] && ax + aw > b[0] && ay < b[1] + b[3] && ay + ah > b[1];
+function solidAt(x, y, w, h) { for (const s of game.map.solids) if (overlap(x, y, w, h, s)) return s; return null; }
+
+// ---------- PLAYER PHYSICS --------------------------------------------------
+function step(dt) {
+  const m = game.map;
+  P.px = P.x; P.py = P.y;
+  const control = game.mode === 'run';
+  const dir = control ? (down(K_RIGHT) ? 1 : 0) - (down(K_LEFT) ? 1 : 0) : (game.mode === 'finished' ? 0 : 0);
+  const jumpHeld = control && down(K_JUMP);
+  if (control && jumpPressed) P.buffer = PHYS.buffer;
+  jumpPressed = false;
+
+  P.wallLock = Math.max(0, P.wallLock - dt);
+  P.buffer = Math.max(0, P.buffer - dt);
+  P.coyote = P.onGround ? PHYS.coyote : Math.max(0, P.coyote - dt);
+  P.wallMemT = Math.max(0, P.wallMemT - dt);
+  P.land = Math.max(0, P.land - dt);
+  P.stretch = Math.max(0, P.stretch - dt * 6);
+
+  // --- horizontal ---
+  const ax = Math.abs(P.vx), sv = Math.sign(P.vx);
+  if (P.onGround) {
+    if (dir !== 0) {
+      if (sv !== 0 && sv !== dir) P.vx += dir * PHYS.turnAccel * dt;
+      else if (ax > PHYS.maxRun) P.vx -= sv * Math.min(ax - PHYS.maxRun, PHYS.overspeedDecay * dt);
+      else P.vx = dir * Math.min(PHYS.maxRun, ax + PHYS.groundAccel * dt);
+      P.facing = dir;
+    } else if (P.roll <= 0) {
+      P.vx = sv * Math.max(0, ax - PHYS.groundFric * dt);
+    }
+  } else {
+    if (dir !== 0 && P.wallLock <= 0) {
+      if (sv === dir && ax >= PHYS.maxRun) { /* keep momentum */ }
+      else P.vx = clamp(P.vx + dir * PHYS.airAccel * dt, -Math.max(PHYS.maxRun, ax), Math.max(PHYS.maxRun, ax));
+      if (!P.flipOn) P.facing = dir;
+    } else if (dir === 0) P.vx = sv * Math.max(0, ax - PHYS.airDrag * dt);
+  }
+
+  // --- jumps ---
+  if (P.buffer > 0) {
+    if (P.coyote > 0) {
+      P.vy = -PHYS.jumpVel; P.onGround = false; P.coyote = 0; P.buffer = 0;
+      P.jumpCut = false; P.fromGround = true; P.holdT = 0; P.peak = P.y + P_H; P.airT = 0;
+      P.flipPending = Math.abs(P.vx) > PHYS.flipMinSpeed; P.flipDir = P.facing;
+      P.stretch = 1; P.roll = 0; P.lastWJ = 0;
+      dust(P.x + P_W / 2, P.y + P_H, 7, 0, -1);
+      sfx('jump');
+    } else if (P.wallMemT > 0 && P.wallMem !== 0) {
+      const w = P.wallMem, same = w === P.lastWJ;
+      P.vx = -w * PHYS.wallJumpX;
+      P.vy = -(same ? PHYS.wallJumpSameY : PHYS.wallJumpY);
+      P.wallLock = PHYS.wallLock; P.lastWJ = w; P.facing = -w; P.buffer = 0; P.wallMemT = 0;
+      P.jumpCut = true; P.fromGround = false; P.wallStickT = 0;
+      if (!same) { P.flipOn = true; P.flip = 0; P.flipDir = -w; P.flipPending = false; }
+      P.stretch = 1;
+      dust(w > 0 ? P.x + P_W : P.x, P.y + P_H * 0.6, 9, -w, 0);
+      sfx('wall');
+    }
+  }
+  if (!P.onGround) P.holdT += dt;
+  if (P.fromGround && !P.jumpCut && !jumpHeld && P.vy < 0) { P.vy *= PHYS.jumpCut; P.jumpCut = true; P.flipPending = false; }
+
+  // --- gravity ---
+  let g = PHYS.gravity;
+  if (P.vy > 0) g *= PHYS.fallMult;
+  else if (Math.abs(P.vy) < PHYS.apexBand && jumpHeld) g *= PHYS.apexMult;
+  if (!P.onGround) P.vy += g * dt;
+
+  // --- wall slide ---
+  const sliding = !P.onGround && P.wallDir !== 0 && P.vy > 0;
+  if (sliding) {
+    if (!P.wasWall) P.wallStickT = PHYS.wallStick;
+    if (P.wallStickT > 0) { P.wallStickT -= dt; P.vy = Math.min(P.vy, 25); }
+    else P.vy = Math.min(P.vy, PHYS.wallSlideMax);
+    P.facing = P.wallDir; P.flipOn = false; P.flipPending = false;
+    P.dustT -= dt;
+    if (P.dustT <= 0) { P.dustT = 0.06; dust(P.wallDir > 0 ? P.x + P_W : P.x, P.y + P_H - 4, 1, 0, 0.3, 0.6); }
+  }
+  P.wasWall = sliding;
+  P.vy = Math.min(P.vy, PHYS.maxFall);
+
+  // --- integrate X ---
+  P.x += P.vx * dt;
+  let s;
+  while ((s = solidAt(P.x, P.y, P_W, P_H))) {
+    if (P.vx > 0) P.x = s[0] - P_W; else if (P.vx < 0) P.x = s[0] + s[2];
+    else P.x = (P.x + P_W / 2 < s[0] + s[2] / 2) ? s[0] - P_W : s[0] + s[2];
+    P.vx = 0;
+  }
+  if (P.x < 0) { P.x = 0; P.vx = 0; }
+  if (P.x > m.width - P_W) { P.x = m.width - P_W; P.vx = 0; }
+
+  // --- integrate Y ---
+  const wasGround = P.onGround;
+  P.y += P.vy * dt;
+  P.onGround = false;
+  while ((s = solidAt(P.x, P.y, P_W, P_H))) {
+    if (P.vy > 0) { P.y = s[1] - P_H; P.onGround = true; }
+    else { P.y = s[1] + s[3]; }
+    P.vy = 0;
+  }
+  if (!P.onGround && P.vy >= 0 && solidAt(P.x, P.y + P_H, P_W, 1)) P.onGround = true;
+
+  // --- leave / land ---
+  if (wasGround && !P.onGround) { P.peak = P.y + P_H; P.airT = 0; }
+  if (!P.onGround) { P.airT += dt; P.peak = Math.min(P.peak, P.y + P_H); }
+  if (!wasGround && P.onGround) onLand();
+
+  // --- flips ---
+  if (P.flipPending && !P.onGround && P.holdT > 0.1 && jumpHeld) { P.flipOn = true; P.flip = 0; P.flipPending = false; }
+  if (P.flipOn) {
+    P.flip += dt / PHYS.flipTime * (P.onGround ? 3 : 1);   // finish fast if we land mid-flip (no snapping)
+    if (P.flip >= 1) { P.flipOn = false; P.flip = 0; }
+  }
+  if (P.roll > 0) {
+    P.roll -= dt;
+    if (Math.abs(P.vx) < PHYS.rollMinSpeed * 0.85) P.vx = P.facing * PHYS.rollMinSpeed * 0.85;
+    P.dustT -= dt;
+    if (P.dustT <= 0 && P.onGround) { P.dustT = 0.035; dust(P.x + P_W / 2 - P.facing * 8, P.y + P_H, 1, -P.facing * 0.5, -0.2); }
+  }
+
+  // --- wall probe ---
+  P.wallDir = 0;
+  if (!P.onGround) {
+    const probeY = P.y + 8, probeH = P_H - 16;
+    if (solidAt(P.x - 2, probeY, 2, probeH)) P.wallDir = -1;
+    else if (solidAt(P.x + P_W, probeY, 2, probeH)) P.wallDir = 1;
+    if (P.wallDir !== 0) { P.wallMem = P.wallDir; P.wallMemT = PHYS.wallCoyote; }
+  }
+
+  // --- run dust ---
+  if (P.onGround && Math.abs(P.vx) > 260 && P.roll <= 0) {
+    P.dustT -= dt;
+    if (P.dustT <= 0) { P.dustT = 0.09 - Math.abs(P.vx) / 10000; dust(P.x + P_W / 2 - Math.sign(P.vx) * 6, P.y + P_H, 1, -Math.sign(P.vx) * 0.4, -0.3, 0.7); }
+  }
+
+  // --- animation timers & kimono spring ---
+  P.phase += Math.abs(P.vx) * dt * 0.042;
+  const flapTarget = clamp(-Math.abs(P.vx) / PHYS.maxRun * 0.55 + (P.onGround ? 0 : clamp(P.vy / 900, -0.6, 0.6)), -1.1, 0.8);
+  P.flapV += ((flapTarget - P.flap) * 160 - P.flapV * 14) * dt;
+  P.flap += P.flapV * dt;
+
+  if (!control) return;
+  // --- hazards, checkpoints, finish ---
+  for (const sp of m.spikes) if (overlap(P.x + 3, P.y, P_W - 6, P_H, [sp[0] + 4, sp[1] - 16, sp[2] - 8, 16])) return die();
+  if (P.y > m.deathY) return die();
+  for (const cx of m.checkpoints) if (P.x > cx && (!game.checkpoint || game.checkpoint.x < cx)) {
+    game.checkpoint = { x: cx + 30, y: groundBelow(cx + 30) }; sfx('check');
+  }
+  if (P.x + P_W > m.finish.x) finish();
+}
+function onLand() {
+  const fall = (P.y + P_H) - P.peak;
+  P.lastWJ = 0; P.fromGround = false; P.flipPending = false;
+  if (fall > PHYS.rollFall && P.wallDir === 0) {
+    P.roll = PHYS.rollTime; P.flipOn = false;
+    if (Math.abs(P.vx) < PHYS.rollMinSpeed) P.vx = P.facing * PHYS.rollMinSpeed;
+    dust(P.x + P_W / 2, P.y + P_H, 10, 0, -0.6, 1.2); sfx('roll');
+  } else if (fall > 50) {
+    P.land = 0.13; dust(P.x + P_W / 2, P.y + P_H, 6, 0, -0.5); sfx('land');
+  }
+}
+function groundBelow(x) {
+  let best = G;
+  for (const s of game.map.solids) if (x >= s[0] && x <= s[0] + s[2] && s[1] < best + 1 && s[1] > 0) best = Math.min(best, s[1]);
+  return best;
+}
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+
+// ---------- ANIMATION (procedural rig + pose blending) ----------------------
+// Angles in radians measured from "straight down"; positive swings forward (toward facing).
+let pose;
+const poseIdle = t => ({ hip: 22 + Math.sin(t * 2.2) * 0.5, lean: 0.04, th: [0.12, -0.1], sh: [0.05, 0.05], ua: [0.15, -0.12], la: [0.35, 0.3] });
+function targetPose(t) {
+  const sp = Math.min(1, Math.abs(P.vx) / PHYS.maxRun);
+  if (P.roll > 0) return { hip: 13, lean: 0.9, th: [2.1, 1.9], sh: [2.6, 2.6], ua: [1.2, 1.0], la: [1.1, 1.1] };
+  if (P.flipOn) return { hip: 15, lean: 0.6, th: [2.0, 1.8], sh: [2.5, 2.5], ua: [1.3, 1.1], la: [1.0, 1.0] };
+  if (!P.onGround && P.wallDir !== 0 && P.vy > 0)
+    return { hip: 20, lean: 0.28, th: [0.75, 0.25], sh: [1.2, 0.7], ua: [2.1, -0.45], la: [0.15, 0.4] };
+  if (!P.onGround) {
+    if (P.vy < -120) return { hip: 21, lean: 0.12, th: [1.15, 0.2], sh: [1.6, 0.5], ua: [2.7, -0.5], la: [0.3, 0.6] };
+    if (P.vy < 160) return { hip: 21, lean: 0.12, th: [0.7, 0.05], sh: [1.0, 0.6], ua: [1.9, -1.0], la: [0.4, 0.4] };
+    return { hip: 22, lean: 0.06, th: [0.35, -0.2], sh: [0.35, 0.6], ua: [1.55, -1.45], la: [0.2, 0.2] };
+  }
+  if (P.land > 0) { const k = P.land / 0.13; return { hip: 22 - 7 * k, lean: 0.25 + 0.2 * k, th: [0.9 * k + 0.1, 0.7 * k], sh: [1.6 * k, 1.4 * k], ua: [0.6, -0.4], la: [0.6, 0.4] }; }
+  if (sp > 0.04) {
+    const p = P.phase, s = Math.sin(p), c = Math.cos(p);
+    return {
+      hip: 22 - Math.abs(c) * 1.8 * sp, lean: 0.08 + 0.32 * sp,
+      th: [0.95 * s * sp, -0.95 * s * sp],
+      sh: [0.25 + Math.max(0, -c) * 1.5 * sp, 0.25 + Math.max(0, c) * 1.5 * sp],
+      ua: [-0.85 * s * sp, 0.85 * s * sp], la: [0.9 + 0.3 * sp, 0.9 + 0.3 * sp],
+    };
+  }
+  return poseIdle(t);
+}
+function blendPose(target, k) {
+  const L = (a, b) => a + (b - a) * k;
+  pose = { hip: L(pose.hip, target.hip), lean: L(pose.lean, target.lean),
+    th: [L(pose.th[0], target.th[0]), L(pose.th[1], target.th[1])],
+    sh: [L(pose.sh[0], target.sh[0]), L(pose.sh[1], target.sh[1])],
+    ua: [L(pose.ua[0], target.ua[0]), L(pose.ua[1], target.ua[1])],
+    la: [L(pose.la[0], target.la[0]), L(pose.la[1], target.la[1])] };
+}
+const easeInOut = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+// draws the samurai with feet-center at (0,0), facing +x
+function drawSamurai(c, ps, hat, kim, flap, lw = 3.2) {
+  const hip = [0, -ps.hip];
+  const sh = [hip[0] + Math.sin(ps.lean) * 14, hip[1] - Math.cos(ps.lean) * 14];
+  const head = [sh[0] + Math.sin(ps.lean * 0.7) * 8.5, sh[1] - Math.cos(ps.lean * 0.7) * 8.5];
+  const seg = (o, a, len) => [o[0] + Math.sin(a) * len, o[1] + Math.cos(a) * len];
+  const line = (a, b, w = lw) => { c.lineWidth = w; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); };
+  c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = '#0a0a0a';
+  const limbs = i => {
+    const knee = seg(hip, ps.th[i] + ps.lean * 0.2, 11), foot = seg(knee, ps.th[i] - ps.sh[i], 11.5);
+    const elb = seg(sh, ps.ua[i] + ps.lean * 0.3, 8.5), hand = seg(elb, ps.ua[i] + ps.la[i], 8);
+    return { knee, foot, elb, hand };
+  };
+  const back = limbs(1), front = limbs(0);
+  // back limbs (slightly lighter for depth)
+  c.globalAlpha = 0.8;
+  line(hip, back.knee); line(back.knee, back.foot);
+  line(sh, back.elb); line(back.elb, back.hand);
+  c.globalAlpha = 1;
+  // kimono body
+  const perp = [Math.cos(ps.lean), Math.sin(ps.lean)];
+  const hemDrop = 7, fl = flap * 6;
+  c.fillStyle = kim;
+  c.beginPath();
+  c.moveTo(sh[0] - perp[0] * 4, sh[1] - perp[1] * 4);
+  c.lineTo(sh[0] + perp[0] * 4.5, sh[1] + perp[1] * 4.5);
+  c.lineTo(hip[0] + perp[0] * 6.5 + Math.sin(ps.lean) * hemDrop, hip[1] + perp[1] * 6.5 + Math.cos(ps.lean) * hemDrop);
+  c.lineTo(hip[0] - perp[0] * 7.5 + Math.sin(ps.lean) * hemDrop + fl, hip[1] - perp[1] * 7.5 + Math.cos(ps.lean) * hemDrop + Math.abs(fl) * 0.4);
+  c.closePath(); c.fill();
+  c.lineWidth = 1.2; c.stroke();
+  // obi belt
+  const ob = [lerp(hip[0], sh[0], 0.18), lerp(hip[1], sh[1], 0.18)];
+  line([ob[0] - perp[0] * 6.6, ob[1] - perp[1] * 6.6], [ob[0] + perp[0] * 6, ob[1] + perp[1] * 6], 2.6);
+  // front leg
+  line(hip, front.knee); line(front.knee, front.foot);
+  // head
+  c.fillStyle = '#0a0a0a';
+  c.beginPath(); c.arc(head[0], head[1], 6.6, 0, Math.PI * 2); c.fill();
+  // kasa hat
+  c.save(); c.translate(head[0], head[1] - 4.2); c.rotate(ps.lean * 0.5 - flap * 0.06);
+  c.fillStyle = hat; c.beginPath();
+  c.moveTo(-14, 1.5); c.quadraticCurveTo(0, -1, 14, 1.5); c.lineTo(1.5, -8.5); c.lineTo(-1.5, -8.5); c.closePath();
+  c.fill(); c.lineWidth = 1.1; c.stroke(); c.restore();
+  // front arm with kimono sleeve
+  c.strokeStyle = kim; line(sh, seg(sh, ps.ua[0] + ps.lean * 0.3, 5.5), 6.5);
+  c.strokeStyle = '#0a0a0a'; line(sh, front.elb); line(front.elb, front.hand);
+}
+
+// ---------- PARTICLES -------------------------------------------------------
+const parts = [];
+function dust(x, y, n, dx = 0, dy = -1, spread = 1) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, sp = (40 + Math.random() * 90) * spread;
+    parts.push({ x, y, vx: Math.cos(a) * sp * 0.8 + dx * 140, vy: Math.sin(a) * sp * 0.35 + dy * 60 - 20,
+      life: 0.35 + Math.random() * 0.3, t: 0, r: 1.2 + Math.random() * 2.4, g: Math.random() < 0.5 });
+  }
+}
+function updParts(dt) {
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i]; p.t += dt;
+    if (p.t >= p.life) { parts.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.92; p.vy = p.vy * 0.92 + 40 * dt;
+  }
+}
+
+// ---------- CAMERA ----------------------------------------------------------
+const cam = { x: 0, y: 0, look: 0, px: 0, py: 0 };
+function updCam(dt, snap = false) {
+  cam.px = cam.x; cam.py = cam.y;
+  const m = game.map;
+  const lookT = clamp(P.vx * 0.42, -200, 280) + (Math.abs(P.vx) < 30 ? 120 * P.facing : 0);
+  cam.look = snap ? lookT : lerp(cam.look, lookT, 1 - Math.exp(-2.6 * dt));
+  const tx = clamp(P.x + P_W / 2 - VW * 0.36 + cam.look * 0.8, 0, m.width - VW);
+  const base = G - VH * 0.8;
+  const ty = clamp(Math.min(base, P.y + P_H - VH * 0.62), m.top, base);
+  cam.x = snap ? tx : lerp(cam.x, tx, 1 - Math.exp(-9 * dt));
+  cam.y = snap ? ty : lerp(cam.y, ty, 1 - Math.exp(-4 * dt));
+  if (snap) { cam.px = cam.x; cam.py = cam.y; }
+}
+
+// ---------- RENDER ----------------------------------------------------------
+const cv = document.getElementById('game'), ctx = cv.getContext('2d');
+let scale = 1, offX = 0, offY = 0;
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
+  scale = Math.min(innerWidth / VIEW_W, innerHeight / VIEW_H) * dpr;
+  offX = (cv.width - VIEW_W * scale) / 2; offY = (cv.height - VIEW_H * scale) / 2;
+}
+addEventListener('resize', resize); resize();
+
+function drawBush(c, s) {
+  const [x, y, w, h] = s, n = Math.max(2, Math.round(w / 20)), r = w / n / 2 + 3;
+  c.beginPath();
+  for (let i = 0; i < n; i++) {
+    const bx = x + (i + 0.5) * (w / n), by = y + r + (i % 2 ? 4 : 0);
+    c.moveTo(bx + r, by); c.arc(bx, by, r, 0, Math.PI * 2);
+  }
+  c.fill();
+  c.fillRect(x, y + r, w, h - r);
+}
+function drawFlag(c, f, t) {
+  const x = f.x, top = G - 230;
+  c.fillStyle = '#0a0a0a'; c.fillRect(x - 3, top, 6, 230);
+  c.beginPath(); c.arc(x, top - 4, 7, 0, Math.PI * 2); c.fillStyle = '#c9a227'; c.fill();
+  const grd = c.createLinearGradient(x, top + 6, x + 90, top + 60);
+  grd.addColorStop(0, '#f7e08a'); grd.addColorStop(0.45, '#c9a227'); grd.addColorStop(0.7, '#a07a12'); grd.addColorStop(1, '#e8c95a');
+  c.fillStyle = grd; c.beginPath();
+  const W = 92, H = 56, seg = 14;
+  c.moveTo(x + 3, top + 8);
+  for (let i = 1; i <= seg; i++) { const u = i / seg; c.lineTo(x + 3 + W * u, top + 8 + Math.sin(t * 5 - u * 5) * 6 * u); }
+  for (let i = seg; i >= 0; i--) { const u = i / seg; c.lineTo(x + 3 + W * u, top + 8 + H + Math.sin(t * 5 - u * 5 + 0.4) * 6 * u - (u > 0.98 ? 0 : 0)); }
+  c.closePath(); c.fill();
+  c.fillStyle = '#0a0a0a'; c.fillRect(x - 40, G - 6, 80, 6);
+}
+function drawCheckpoint(c, x, gy, on) {
+  c.fillStyle = on ? '#0a0a0a' : '#c8c8c8'; c.fillRect(x, gy - 64, 3, 64);
+  c.beginPath(); c.moveTo(x + 3, gy - 64); c.lineTo(x + 26, gy - 56); c.lineTo(x + 3, gy - 48); c.closePath(); c.fill();
+}
+
+let clock = 0;
+function render(alpha) {
+  const c = ctx;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.fillStyle = '#ffffff'; c.fillRect(0, 0, cv.width, cv.height);
+  c.setTransform(scale, 0, 0, scale, offX, offY);
+  c.save(); c.beginPath(); c.rect(0, 0, VIEW_W, VIEW_H); c.clip();
+  const cx = lerp(cam.px, cam.x, alpha), cy = lerp(cam.py, cam.y, alpha);
+  c.scale(ZOOM, ZOOM);
+  c.translate(-cx, -cy);
+  const m = game.map;
+
+  // start line
+  c.font = '700 12px Archivo, sans-serif'; c.fillStyle = '#bdbdbd'; c.fillText('START', m.start.x - 54, m.start.y - 90);
+  c.fillStyle = '#d6d6d6'; c.fillRect(m.start.x - 60, m.start.y - 82, 2, 82);
+
+  for (const cp of m.checkpoints) drawCheckpoint(c, cp, groundBelow(cp + 30), game.checkpoint && game.checkpoint.x - 30 >= cp);
+  drawFlag(c, m.finish, clock);
+
+  c.fillStyle = '#0a0a0a';
+  for (const s of m.solids) {
+    if (s[0] > cx + VW + 50 || s[0] + s[2] < cx - 50) continue;
+    if (s[4] === 'bush') drawBush(c, s); else c.fillRect(s[0] - 0.5, s[1], s[2] + 1, s[3]);
+  }
+  for (const sp of m.spikes) {
+    const n = Math.round(sp[2] / 20), w = sp[2] / n;
+    c.beginPath();
+    for (let i = 0; i < n; i++) { c.moveTo(sp[0] + i * w, sp[1]); c.lineTo(sp[0] + i * w + w / 2, sp[1] - 20); c.lineTo(sp[0] + (i + 1) * w, sp[1]); }
+    c.fill();
+  }
+
+  // particles
+  for (const p of parts) {
+    const k = 1 - p.t / p.life;
+    c.globalAlpha = k * (p.g ? 0.35 : 0.6); c.fillStyle = p.g ? '#7a7a7a' : '#0a0a0a';
+    c.beginPath(); c.arc(p.x, p.y, p.r * (0.6 + 0.4 * k), 0, Math.PI * 2); c.fill();
+  }
+  c.globalAlpha = 1;
+
+  // player
+  if (!P.dead) {
+    const px = lerp(P.px, P.x, alpha) + P_W / 2, py = lerp(P.py, P.y, alpha) + P_H;
+    c.save(); c.translate(px, py);
+    let rot = 0, pivot = 22;
+    if (P.flipOn) rot = easeInOut(Math.min(1, P.flip)) * Math.PI * 2;
+    if (P.roll > 0) { rot = (1 - P.roll / PHYS.rollTime) * Math.PI * 2; pivot = 12; }
+    if (P.facing < 0) c.scale(-1, 1);
+    if (rot) { c.translate(0, -pivot); c.rotate(rot); c.translate(0, pivot); }
+    const st = P.stretch, sq = P.land / 0.13 * 0.5;
+    c.scale(1 - st * 0.07 + sq * 0.1, 1 + st * 0.1 - sq * 0.1);
+    drawSamurai(c, pose, profile ? profile.hat : DEFAULT_HAT, profile ? profile.kimono : DEFAULT_KIM, P.flap);
+    c.restore();
+  }
+  c.restore();
+  drawHUD(c);
+}
+function drawHUD(c) {
+  if (game.mode === 'menu') return;
+  c.textAlign = 'center';
+  const t = game.mode === 'countdown' ? 0 : game.time * 1000;
+  c.font = '700 40px "JetBrains Mono", monospace'; c.fillStyle = '#0a0a0a';
+  c.fillText(fmt(t), VIEW_W / 2, 62);
+  const pb = profile && profile.pbs[game.map.id];
+  c.font = '600 13px Archivo, sans-serif'; c.fillStyle = '#9a9a9a';
+  c.fillText('PB ' + fmt(pb), VIEW_W / 2, 86);
+  if (game.mode === 'countdown') {
+    const n = Math.ceil(game.countdown);
+    const frac = game.countdown - Math.floor(game.countdown);
+    c.font = '900 ' + Math.round(120 + frac * 40) + 'px Archivo, sans-serif';
+    c.globalAlpha = 0.25 + 0.75 * frac; c.fillStyle = '#0a0a0a';
+    c.fillText(n > 0 ? String(n) : '', VIEW_W / 2, VIEW_H / 2 - 20);
+    c.globalAlpha = 1;
+  } else if (game.mode === 'run' && game.time < 0.5) {
+    c.globalAlpha = 1 - game.time / 0.5; c.font = '900 120px Archivo, sans-serif'; c.fillStyle = '#0a0a0a';
+    c.fillText('GO!', VIEW_W / 2, VIEW_H / 2 - 20); c.globalAlpha = 1;
+  }
+  if (game.toast && game.toast.t > 0) {
+    c.globalAlpha = Math.min(1, game.toast.t * 3); c.font = '800 16px Archivo, sans-serif'; c.fillStyle = '#0a0a0a';
+    c.fillText(game.toast.msg, VIEW_W / 2, 118); c.globalAlpha = 1;
+  }
+  c.textAlign = 'left';
+  c.font = '600 12px Archivo, sans-serif'; c.fillStyle = '#b5b5b5';
+  c.fillText(game.map.name, 24, VIEW_H - 22);
+  c.textAlign = 'right'; c.fillText('R restart · ESC pause', VIEW_W - 24, VIEW_H - 22); c.textAlign = 'left';
+}
+
+// ---------- GAME FLOW -------------------------------------------------------
+function startRun(map = MAPS[0]) {
+  game.map = map; game.time = 0; game.countdown = 3; game.lastBeep = 4; game.checkpoint = null;
+  game.mode = 'countdown'; game.resultShown = false; game.toast = null;
+  parts.length = 0; resetPlayer(map.start.x, map.start.y); updCam(0, true);
+  showScreen(null);
+}
+function die() {
+  if (P.dead) return;
+  dust(P.x + P_W / 2, P.y + P_H / 2, 22, 0, -0.5, 1.6); sfx('die');
+  P.dead = true; game.mode = 'dead'; game.deadT = 0.38;
+}
+function respawn() {
+  const cp = game.checkpoint || game.map.start;
+  resetPlayer(cp.x, cp.y); P.facing = 1; game.mode = 'run'; updCam(0, true);
+}
+function finish() {
+  game.mode = 'finished'; game.finishT = 0;
+  const ms = Math.floor(game.time * 1000);
+  game.lastTime = ms;
+  // basic sanity validation before anything gets saved
+  const valid = ms > 6000 && game.validSteps;
+  const prevPB = profile.pbs[game.map.id];
+  game.result = { ms, prevPB, valid, isPB: valid && (prevPB == null || ms < prevPB) };
+  if (game.result.isPB) { profile.pbs[game.map.id] = ms; saveProfile(); }
+  if (valid) submitRun(game.map.id, profile.name, ms);
+  sfx('finish');
+  for (let i = 0; i < 4; i++) dust(game.map.finish.x + 40, G - 140 + i * 30, 6, 0.3, -0.2, 1);
+}
+function pause() {
+  if (game.mode !== 'run' && game.mode !== 'countdown') return;
+  game.prevMode = game.mode; game.mode = 'paused'; showScreen('pause');
+}
+function resume() { game.mode = game.prevMode || 'run'; showScreen(null); jumpPressed = false; }
+
+function onKey(e) {
+  if (e.code === 'KeyR' && ['run', 'countdown', 'dead', 'finished', 'paused'].includes(game.mode)) { startRun(game.map); return; }
+  if (e.code === 'Escape') {
+    if (game.mode === 'paused') resume();
+    else if (game.mode === 'run' || game.mode === 'countdown') pause();
+    else if (current && current !== 'menu' && current !== 'name' && current !== 'result') go(current === 'settings' ? 'back' : 'menu');
+  }
+  if (e.code === 'KeyM' && profile) { profile.mute = !profile.mute; saveProfile(); syncSettings(); toast(profile.mute ? 'SOUND OFF' : 'SOUND ON'); }
+  if (e.code === 'Enter' && game.mode === 'finished' && game.resultShown) startRun(game.map);
+}
+function toast(msg) { game.toast = { msg, t: 1.4 }; }
+
+function tick(dt) {
+  clock += dt;
+  if (game.toast) game.toast.t -= dt;
+  if (game.mode === 'paused') return;
+  if (game.mode === 'countdown') {
+    game.countdown -= dt;
+    const n = Math.ceil(game.countdown);
+    if (n < game.lastBeep && n > 0) { game.lastBeep = n; sfx('beep'); }
+    if (game.countdown <= 0) { game.mode = 'run'; game.time = 0; game.validSteps = true; sfx('go'); jumpPressed = false; }
+    else jumpPressed = false;
+  }
+  if (game.mode === 'run') game.time += dt;
+  if (game.mode === 'dead') { game.time += dt; game.deadT -= dt; if (game.deadT <= 0) respawn(); }
+  if (!P.dead) step(dt);
+  if (game.mode === 'finished') {
+    game.finishT += dt;
+    P.vx *= Math.pow(0.08, dt);
+    if (game.finishT > 0.9 && !game.resultShown) { game.resultShown = true; showResult(); }
+  }
+  updParts(dt); updCam(dt);
+  blendPose(targetPose(clock), 1 - Math.exp(-26 * dt));
+}
+
+let last = performance.now(), acc = 0;
+function frame(now) {
+  if (window.__srManual) { last = now; requestAnimationFrame(frame); return; }
+  let fdt = (now - last) / 1000; last = now;
+  if (fdt > 0.1) fdt = 0.1;
+  if (game.mode === 'menu') { menuDemo(fdt); }
+  else { acc += fdt; while (acc >= DT) { tick(DT); acc -= DT; } }
+  render(game.mode === 'menu' ? 1 : acc / DT);
+  if (current === 'cust') drawPreview(fdt);
+  requestAnimationFrame(frame);
+}
+// Menu background: samurai idles at the start line
+function menuDemo(dt) {
+  clock += dt;
+  P.vx = 0; P.onGround = true; P.roll = 0; P.flipOn = false; P.land = 0;
+  blendPose(poseIdle(clock), 1 - Math.exp(-10 * dt));
+  cam.x = cam.px = 0; cam.y = cam.py = G - VH * 0.8;
+}
+
+// ---------- UI --------------------------------------------------------------
+let current = null, history = [];
+const $ = id => document.getElementById(id);
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+  if (name) $('s-' + name).classList.add('on');
+  if (name && name !== current) history.push(current);
+  current = name;
+  if (name === 'menu') { $('who-name').textContent = profile.name; game.mode = 'menu'; resetPlayer(MAPS[0].start.x, MAPS[0].start.y); }
+  if (name === 'maps') renderMaps();
+  if (name === 'board') renderBoard();
+  if (name === 'cust') syncCust();
+  if (name === 'profile') renderProfile();
+  if (name === 'settings') syncSettings();
+  const first = name && $('s-' + name).querySelector('.btn:not([disabled])');
+  if (first && name !== 'name') setTimeout(() => first.focus({ preventScroll: true }), 0);
+}
+function go(where) {
+  if (where === 'play') return startRun(MAPS[0]);
+  if (where === 'resume') return resume();
+  if (where === 'restart') return startRun(game.map);
+  if (where === 'back') {
+    let prev = history.pop();
+    while (prev === current) prev = history.pop();
+    if (game.mode === 'paused' && prev === 'pause') return showScreen('pause');
+    if (game.mode === 'finished' && prev === 'result') return showScreen('result');
+    return showScreen(prev && prev !== 'name' ? prev : 'menu');
+  }
+  if (['maps', 'menu'].includes(where) && game.mode !== 'menu') game.mode = 'menu';
+  showScreen(where);
+}
+document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
+
+function renderMaps() {
+  const box = $('map-cards'); box.innerHTML = '';
+  MAPS.forEach((m, i) => {
+    const b = boardFor(m.id), d = document.createElement('div');
+    d.className = 'card'; d.tabIndex = 0;
+    d.innerHTML = `<div class="n">MAP ${i + 1} · ${m.difficulty.toUpperCase()}</div><div class="t">${m.name}</div>
+      <div class="s">PB ${fmt(profile.pbs[m.id])}<br>WR ${fmt(b[0] && b[0].time)}</div>`;
+    d.onclick = () => startRun(m); d.onkeydown = e => { if (e.key === 'Enter') startRun(m); };
+    box.appendChild(d);
+  });
+  LOCKED_MAPS.forEach(m => {
+    const d = document.createElement('div'); d.className = 'card locked';
+    d.innerHTML = `<div class="n">MAP ${m.n} · ${m.difficulty.toUpperCase()}</div><div class="t">${m.name}</div><div class="s">🔒 COMING SOON</div>`;
+    box.appendChild(d);
+  });
+}
+function renderBoard() {
+  const m = game.map || MAPS[0], b = boardFor(m.id);
+  $('board-title').textContent = m.name;
+  $('board-body').innerHTML = b.slice(0, 10).map((e, i) =>
+    `<tr class="${e.name === profile.name ? 'me' : ''} ${i === 0 ? 'wr' : ''}"><td>${i + 1}</td><td>${esc(e.name)}</td><td>${fmt(e.time)}</td></tr>`).join('');
+  const r = b.findIndex(e => e.name === profile.name);
+  $('board-me').innerHTML = r < 0 ? 'You have no time on this map yet.' : `Your rank: <b>#${r + 1}</b> of ${b.length} · ${fmt(b[r].time)}`;
+}
+function showResult() {
+  const R = game.result, b = boardFor(game.map.id), rank = b.findIndex(e => e.name === profile.name) + 1;
+  $('res-map').textContent = game.map.name + ' · FINISHED';
+  $('res-time').textContent = fmt(R.ms);
+  $('res-time').classList.toggle('gold', R.isPB);
+  const wr = b[0] && b[0].name === profile.name && b[0].time === R.ms;
+  $('res-flag').textContent = !R.valid ? 'RUN NOT VERIFIED' : wr ? '★ NEW WORLD RECORD (LOCAL)' : R.isPB ? '★ NEW PERSONAL BEST' : '';
+  const diff = R.prevPB == null ? null : R.ms - R.prevPB;
+  $('res-stats').innerHTML =
+    `Previous best &nbsp;${fmt(R.prevPB)}<br>` +
+    (diff == null ? 'First completion!<br>' : `Difference &nbsp;&nbsp;&nbsp;${diff < 0 ? '−' : '+'}${(Math.abs(diff) / 1000).toFixed(3)}s<br>`) +
+    `Map rank &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#${rank} of ${b.length}`;
+  showScreen('result');
+}
+function renderProfile() {
+  $('prof-name').value = profile.name; $('prof-err').textContent = '';
+  $('prof-stats').innerHTML = MAPS.map(m => `${m.name} &nbsp;PB ${fmt(profile.pbs[m.id])}`).join('<br>');
+}
+$('prof-save').onclick = () => {
+  const n = $('prof-name').value.trim();
+  if (!validName(n)) return $('prof-err').textContent = '3–16 characters: letters, numbers, _';
+  if (MOCK_NAMES.includes(n)) return $('prof-err').textContent = 'That username is taken.';
+  const old = profile.name; profile.name = n; saveProfile();
+  for (const m of MAPS) { const l = store.get('sr_lb_' + m.id, []); l.forEach(e => { if (e.name === old) e.name = n; }); store.set('sr_lb_' + m.id, l); }
+  $('prof-err').textContent = 'Saved.';
+};
+function syncSettings() { $('set-sound').textContent = 'SOUND: ' + (profile && profile.mute ? 'OFF' : 'ON') + '  [M]'; }
+$('set-sound').onclick = () => { profile.mute = !profile.mute; saveProfile(); syncSettings(); };
+$('set-reset').onclick = () => {
+  if (!confirm('Delete all your times on this device?')) return;
+  profile.pbs = {}; saveProfile(); for (const m of MAPS) store.set('sr_lb_' + m.id, []);
+  $('set-reset').textContent = 'RECORDS CLEARED';
+};
+const esc = s => s.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+
+// username
+$('name-ok').onclick = submitName;
+$('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') submitName(); });
+function submitName() {
+  const n = $('name-input').value.trim();
+  if (!validName(n)) return $('name-err').textContent = '3–16 characters: letters, numbers or _';
+  if (MOCK_NAMES.includes(n)) return $('name-err').textContent = 'That username is taken. Try another.';
+  profile = { name: n, hat: DEFAULT_HAT, kimono: DEFAULT_KIM, pbs: {}, mute: false };
+  saveProfile(); history = []; showScreen('menu');
+}
+
+// customization
+const pv = $('preview'), pctx = pv.getContext('2d'); let pvT = 0, pvPose = poseIdle(0);
+function syncCust() { $('c-hat').value = profile.hat; $('t-hat').value = profile.hat; $('c-kim').value = profile.kimono; $('t-kim').value = profile.kimono; }
+function setColor(which, v) {
+  if (!/^#[0-9a-fA-F]{6}$/.test(v)) return;
+  profile[which] = v.toLowerCase(); saveProfile(); syncCust();
+}
+$('c-hat').oninput = e => setColor('hat', e.target.value);
+$('c-kim').oninput = e => setColor('kimono', e.target.value);
+$('t-hat').onchange = e => setColor('hat', e.target.value.trim());
+$('t-kim').onchange = e => setColor('kimono', e.target.value.trim());
+$('c-reset').onclick = () => { profile.hat = DEFAULT_HAT; profile.kimono = DEFAULT_KIM; saveProfile(); syncCust(); };
+function drawPreview(dt) {
+  pvT += dt;
+  const c = pctx, W = pv.width;
+  c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#fff'; c.fillRect(0, 0, W, W);
+  c.fillStyle = '#0a0a0a'; c.fillRect(0, W * 0.78, W, W * 0.22);
+  // cycle: run in place, then a flip
+  const cyc = pvT % 4, run = cyc < 2.6;
+  const p = pvT * 10, s = Math.sin(p), co = Math.cos(p);
+  let target = run ? { hip: 22 - Math.abs(co) * 1.8, lean: 0.4, th: [0.95 * s, -0.95 * s], sh: [0.25 + Math.max(0, -co) * 1.5, 0.25 + Math.max(0, co) * 1.5], ua: [-0.85 * s, 0.85 * s], la: [1.2, 1.2] }
+    : { hip: 15, lean: 0.6, th: [2.0, 1.8], sh: [2.5, 2.5], ua: [1.3, 1.1], la: [1.0, 1.0] };
+  const k = 1 - Math.exp(-20 * dt), L = (a, b) => a + (b - a) * k;
+  pvPose = { hip: L(pvPose.hip, target.hip), lean: L(pvPose.lean, target.lean), th: pvPose.th.map((v, i) => L(v, target.th[i])), sh: pvPose.sh.map((v, i) => L(v, target.sh[i])), ua: pvPose.ua.map((v, i) => L(v, target.ua[i])), la: pvPose.la.map((v, i) => L(v, target.la[i])) };
+  c.save(); c.translate(W / 2, W * 0.78);
+  let y = 0, rot = 0;
+  if (!run) { const u = (cyc - 2.6) / 1.4; y = -Math.sin(u * Math.PI) * 120; rot = easeInOut(clamp(u * 1.15, 0, 1)) * Math.PI * 2; }
+  c.translate(0, y); c.scale(4.2, 4.2);
+  if (rot) { c.translate(0, -22); c.rotate(rot); c.translate(0, 22); }
+  drawSamurai(c, pvPose, profile.hat, profile.kimono, run ? -0.5 + Math.sin(pvT * 9) * 0.12 : 0.3, 3);
+  c.restore();
+}
+
+// ---------- BOOT ------------------------------------------------------------
+resetPlayer(MAPS[0].start.x, MAPS[0].start.y); updCam(0, true);
+if (profile && profile.name) { profile.pbs = profile.pbs || {}; showScreen('menu'); }
+else { showScreen('name'); setTimeout(() => $('name-input').focus(), 50); }
+requestAnimationFrame(frame);
+
+// test hook (harmless in production)
+window.__sr = { game, P, PHYS, keys, press: () => { jumpPressed = true; }, tick, step, startRun, MAPS, render };
+</script>
+</body>
+</html>
