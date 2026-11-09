@@ -16,6 +16,12 @@
   .screen { position:fixed; inset:0; display:none; align-items:center; justify-content:center; padding:24px; }
   .screen.on { display:flex; }
   .scrim { background:rgba(255,255,255,.86); backdrop-filter:blur(3px); }
+  .solid { background:#fff; }
+  #s-menu { align-items:stretch; justify-content:stretch; }
+  .home { width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; max-width:1200px; margin:0 auto; }
+  .home .head { text-align:center; }
+  .home .menu { margin-top:56px; }
+  .online { font-size:12px; letter-spacing:.14em; font-weight:600; color:var(--mute); margin-top:10px; }
   .panel { width:min(640px,100%); }
   .title { font-weight:900; font-size:clamp(48px,10vw,120px); letter-spacing:-.04em; line-height:.9; }
   .sub { font-style:italic; color:var(--mute); margin-top:14px; font-size:18px; letter-spacing:.01em; }
@@ -70,7 +76,7 @@
 <canvas id="game"></canvas>
 
 <!-- USERNAME -->
-<div class="screen scrim" id="s-name">
+<div class="screen solid" id="s-name">
   <div class="panel">
     <div class="title" style="font-size:clamp(40px,8vw,84px)">SPEEDRUNNER</div>
     <p class="sub">Every millisecond counts.</p>
@@ -82,11 +88,13 @@
 </div>
 
 <!-- MAIN MENU -->
-<div class="screen scrim" id="s-menu">
+<div class="screen solid" id="s-menu">
   <div class="who">RUNNER <b id="who-name"></b></div>
-  <div class="panel">
-    <div class="title">SPEEDRUNNER</div>
-    <p class="sub">Every millisecond counts.</p>
+  <div class="home">
+    <div class="head">
+      <div class="title">SPEEDRUNNER</div>
+      <p class="sub">Every millisecond counts.</p>
+    </div>
     <div class="menu">
       <button class="btn" data-go="play">PLAY</button>
       <button class="btn" data-go="maps">MAPS</button>
@@ -101,7 +109,7 @@
 </div>
 
 <!-- MAPS -->
-<div class="screen scrim" id="s-maps">
+<div class="screen solid" id="s-maps">
   <div class="panel" style="width:min(900px,100%)">
     <h2>MAPS</h2>
     <div class="cards" id="map-cards"></div>
@@ -110,18 +118,18 @@
 </div>
 
 <!-- LEADERBOARD -->
-<div class="screen scrim" id="s-board">
+<div class="screen solid" id="s-board">
   <div class="panel">
     <h2 id="board-title">FIRST STEPS</h2>
-    <div class="tag">LOCAL MODE · this device only</div>
-    <table><thead><tr><th>RANK</th><th>USERNAME</th><th>BEST TIME</th></tr></thead><tbody id="board-body"></tbody></table>
+    <div class="online" id="board-status"></div>
+    <table id="board-table"><thead><tr><th>RANK</th><th>USERNAME</th><th>BEST TIME</th></tr></thead><tbody id="board-body"></tbody></table>
     <div class="stats" id="board-me"></div>
     <div class="row"><button class="btn small" data-go="back">← BACK</button><button class="btn small" data-go="play">PLAY MAP →</button></div>
   </div>
 </div>
 
 <!-- CUSTOMIZE -->
-<div class="screen scrim" id="s-cust">
+<div class="screen solid" id="s-cust">
   <div class="panel" style="width:min(760px,100%)">
     <h2>CUSTOMIZE</h2>
     <div class="cust">
@@ -139,7 +147,7 @@
 </div>
 
 <!-- PROFILE -->
-<div class="screen scrim" id="s-profile">
+<div class="screen solid" id="s-profile">
   <div class="panel">
     <h2>PROFILE</h2>
     <div class="label" style="margin-top:20px">Username</div>
@@ -151,7 +159,7 @@
 </div>
 
 <!-- SETTINGS -->
-<div class="screen scrim" id="s-settings">
+<div class="screen solid" id="s-settings">
   <div class="panel">
     <h2>SETTINGS</h2>
     <div class="menu">
@@ -221,25 +229,33 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
-const MOCK_NAMES = ['ShadowRunner', 'KuroSpeed', 'NinjaZero', 'Hayabusa', 'InkDash'];
-const MOCK_BOARD = { m1: [
-  { name: 'ShadowRunner', time: 13842 }, { name: 'KuroSpeed', time: 14395 },
-  { name: 'NinjaZero', time: 15118 }, { name: 'Hayabusa', time: 16904 }, { name: 'InkDash', time: 19477 },
-]};
 let profile = store.get('sr_profile', null);
 function saveProfile() { store.set('sr_profile', profile); }
-function boardFor(mapId) {
-  const local = store.get('sr_lb_' + mapId, []);
-  const all = [...(MOCK_BOARD[mapId] || []), ...local];
-  const best = new Map();
-  for (const e of all) if (!best.has(e.name) || best.get(e.name) > e.time) best.set(e.name, e.time);
-  return [...best].map(([name, time]) => ({ name, time })).sort((a, b) => a.time - b.time);
+const newToken = () => [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
+
+// ---------- ONLINE LEADERBOARD (/api/lb) -----------------------------------
+const net = { online: false, wr: {}, boards: {} };
+async function api(method, data) {
+  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 7000);
+  try {
+    const url = '/api/lb' + (method === 'GET' ? '?' + new URLSearchParams(data) : '');
+    const r = await fetch(url, method === 'GET' ? { signal: ctl.signal } :
+      { method, signal: ctl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    const j = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, ...j };
+  } catch { return { ok: false, status: 0, error: 'network' }; }
+  finally { clearTimeout(to); }
 }
-function submitRun(mapId, name, time) {
-  const local = store.get('sr_lb_' + mapId, []);
-  const i = local.findIndex(e => e.name === name);
-  if (i < 0) local.push({ name, time }); else if (time < local[i].time) local[i].time = time;
-  store.set('sr_lb_' + mapId, local);
+async function loadBoard(mapId) {
+  const r = await api('GET', profile ? { map: mapId, name: profile.name } : { map: mapId });
+  net.online = r.ok;
+  if (r.ok) { net.boards[mapId] = r; net.wr[mapId] = r.top[0] || null; }
+  return r;
+}
+async function claimName(name) {
+  const r = await api('POST', { action: 'claim', name, token: profile.token });
+  if (r.ok) { net.online = true; profile.claimed = true; saveProfile(); }
+  return r;
 }
 const fmt = ms => {
   if (ms == null) return '--:--.---';
@@ -247,7 +263,8 @@ const fmt = ms => {
   const m = Math.floor(ms / 60000), s = Math.floor(ms / 1000) % 60, r = ms % 1000;
   return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0') + '.' + String(r).padStart(3, '0');
 };
-const validName = n => /^[A-Za-z0-9_]{3,16}$/.test(n);
+const validName = n => /^[A-Za-z0-9_-]{3,16}$/.test(n);
+const NAME_HELP = '3–16 characters: letters, numbers, _ or - (no spaces)';
 
 // ---------- INPUT -----------------------------------------------------------
 const keys = {}; let jumpPressed = false;
@@ -777,6 +794,9 @@ function startRun(map = MAPS[0]) {
   game.mode = 'countdown'; game.resultShown = false; game.toast = null;
   parts.length = 0; resetPlayer(map.start.x, map.start.y); updCam(0, true);
   showScreen(null);
+  const serial = game.serial = (game.serial || 0) + 1; game.runId = null;
+  if (net.online && profile.claimed) api('POST', { action: 'start', name: profile.name, token: profile.token, map: map.id })
+    .then(r => { if (r.ok && game.serial === serial) game.runId = r.run; });
 }
 function die() {
   if (P.dead) return;
@@ -796,7 +816,15 @@ function finish() {
   const prevPB = profile.pbs[game.map.id];
   game.result = { ms, prevPB, valid, isPB: valid && (prevPB == null || ms < prevPB) };
   if (game.result.isPB) { profile.pbs[game.map.id] = ms; saveProfile(); }
-  if (valid) submitRun(game.map.id, profile.name, ms);
+  game.result.pending = valid && net.online && !!game.runId;
+  if (game.result.pending) {
+    const R = game.result, mapId = game.map.id;
+    api('POST', { action: 'submit', name: profile.name, token: profile.token, map: mapId, time: ms, run: game.runId }).then(r => {
+      R.pending = false; R.server = r;
+      if (r.ok) { net.boards[mapId] = r; net.wr[mapId] = r.top[0] || null; }
+      if (current === 'result') showResult();
+    });
+  }
   sfx('finish');
   for (let i = 0; i < 4; i++) dust(game.map.finish.x + 40, G - 140 + i * 30, 6, 0.3, -0.2, 1);
 }
@@ -846,7 +874,7 @@ function frame(now) {
   if (window.__srManual) { last = now; requestAnimationFrame(frame); return; }
   let fdt = (now - last) / 1000; last = now;
   if (fdt > 0.1) fdt = 0.1;
-  if (game.mode === 'menu') { menuDemo(fdt); }
+  if (game.mode === 'menu') { menuDemo(fdt); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height); if (current === 'cust') drawPreview(fdt); requestAnimationFrame(frame); return; }
   else { acc += fdt; while (acc >= DT) { tick(DT); acc -= DT; } }
   render(game.mode === 'menu' ? 1 : acc / DT);
   if (current === 'cust') drawPreview(fdt);
@@ -896,10 +924,10 @@ document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', 
 function renderMaps() {
   const box = $('map-cards'); box.innerHTML = '';
   MAPS.forEach((m, i) => {
-    const b = boardFor(m.id), d = document.createElement('div');
+    const wr = net.wr[m.id], d = document.createElement('div');
     d.className = 'card'; d.tabIndex = 0;
     d.innerHTML = `<div class="n">MAP ${i + 1} · ${m.difficulty.toUpperCase()}</div><div class="t">${m.name}</div>
-      <div class="s">PB ${fmt(profile.pbs[m.id])}<br>WR ${fmt(b[0] && b[0].time)}</div>`;
+      <div class="s">PB ${fmt(profile.pbs[m.id])}<br>WR ${wr ? fmt(wr.time) + ' ' + esc(wr.name) : '--:--.---'}</div>`;
     d.onclick = () => startRun(m); d.onkeydown = e => { if (e.key === 'Enter') startRun(m); };
     box.appendChild(d);
   });
@@ -908,46 +936,76 @@ function renderMaps() {
     d.innerHTML = `<div class="n">MAP ${m.n} · ${m.difficulty.toUpperCase()}</div><div class="t">${m.name}</div><div class="s">🔒 COMING SOON</div>`;
     box.appendChild(d);
   });
+  if (!box.dataset.loading) { box.dataset.loading = 1; loadBoard(MAPS[0].id).then(() => { delete box.dataset.loading; if (current === 'maps' && net.online) renderMapsQuiet(); }); }
+}
+function renderMapsQuiet() { const box = $('map-cards'); box.dataset.loading = 1; renderMaps(); delete box.dataset.loading; }
+function paintBoard(m, b) {
+  const top = b ? b.top : [];
+  $('board-body').innerHTML = top.length ? top.map((e, i) =>
+    `<tr class="${e.name === profile.name ? 'me' : ''} ${i === 0 ? 'wr' : ''}"><td>${i + 1}</td><td>${esc(e.name)}</td><td>${fmt(e.time)}</td></tr>`).join('')
+    : `<tr><td colspan="3" style="color:var(--mute)">${b ? 'No times yet. Be the first!' : '—'}</td></tr>`;
+  const pb = profile.pbs[m.id];
+  if (!b) $('board-me').innerHTML = 'Your personal best: ' + fmt(pb);
+  else if (b.me) $('board-me').innerHTML = `Your rank: <b>#${b.me.rank}</b> of ${b.total} · ${fmt(b.me.time)}`;
+  else $('board-me').innerHTML = 'You have no time on this map yet.';
 }
 function renderBoard() {
-  const m = game.map || MAPS[0], b = boardFor(m.id);
+  const m = game.map || MAPS[0];
   $('board-title').textContent = m.name;
-  $('board-body').innerHTML = b.slice(0, 10).map((e, i) =>
-    `<tr class="${e.name === profile.name ? 'me' : ''} ${i === 0 ? 'wr' : ''}"><td>${i + 1}</td><td>${esc(e.name)}</td><td>${fmt(e.time)}</td></tr>`).join('');
-  const r = b.findIndex(e => e.name === profile.name);
-  $('board-me').innerHTML = r < 0 ? 'You have no time on this map yet.' : `Your rank: <b>#${r + 1}</b> of ${b.length} · ${fmt(b[r].time)}`;
+  const cached = net.boards[m.id];
+  $('board-status').textContent = cached ? `${cached.total} PLAYER${cached.total === 1 ? '' : 'S'} · GLOBAL` : 'LOADING…';
+  paintBoard(m, cached);
+  loadBoard(m.id).then(r => {
+    if (current !== 'board') return;
+    if (r.ok) { $('board-status').textContent = `${r.total} PLAYER${r.total === 1 ? '' : 'S'} · GLOBAL`; paintBoard(m, r); }
+    else { $('board-status').textContent = 'LEADERBOARD OFFLINE · try again later'; paintBoard(m, null); }
+  });
 }
 function showResult() {
-  const R = game.result, b = boardFor(game.map.id), rank = b.findIndex(e => e.name === profile.name) + 1;
+  const R = game.result, S = R.server;
   $('res-map').textContent = game.map.name + ' · FINISHED';
   $('res-time').textContent = fmt(R.ms);
   $('res-time').classList.toggle('gold', R.isPB);
-  const wr = b[0] && b[0].name === profile.name && b[0].time === R.ms;
-  $('res-flag').textContent = !R.valid ? 'RUN NOT VERIFIED' : wr ? '★ NEW WORLD RECORD (LOCAL)' : R.isPB ? '★ NEW PERSONAL BEST' : '';
+  const wr = S && S.ok && S.top[0] && S.top[0].name === profile.name && S.top[0].time === R.ms;
+  $('res-flag').textContent = wr ? '★ NEW WORLD RECORD' : R.isPB ? '★ NEW PERSONAL BEST' : '';
   const diff = R.prevPB == null ? null : R.ms - R.prevPB;
+  let rank = '—';
+  if (R.pending) rank = 'checking…';
+  else if (S && S.ok && S.me) rank = `#${S.me.rank} of ${S.total}`;
+  else if (S && !S.ok) rank = S.error === 'rejected' || S.error === 'invalid-time' ? 'run not verified' : 'offline';
+  else if (!net.online) rank = 'offline';
   $('res-stats').innerHTML =
     `Previous best &nbsp;${fmt(R.prevPB)}<br>` +
     (diff == null ? 'First completion!<br>' : `Difference &nbsp;&nbsp;&nbsp;${diff < 0 ? '−' : '+'}${(Math.abs(diff) / 1000).toFixed(3)}s<br>`) +
-    `Map rank &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#${rank} of ${b.length}`;
-  showScreen('result');
+    `Global rank &nbsp;&nbsp;&nbsp;${rank}`;
+  if (current !== 'result') showScreen('result');
 }
 function renderProfile() {
   $('prof-name').value = profile.name; $('prof-err').textContent = '';
   $('prof-stats').innerHTML = MAPS.map(m => `${m.name} &nbsp;PB ${fmt(profile.pbs[m.id])}`).join('<br>');
 }
-$('prof-save').onclick = () => {
+$('prof-save').onclick = async () => {
   const n = $('prof-name').value.trim();
-  if (!validName(n)) return $('prof-err').textContent = '3–16 characters: letters, numbers, _';
-  if (MOCK_NAMES.includes(n)) return $('prof-err').textContent = 'That username is taken.';
-  const old = profile.name; profile.name = n; saveProfile();
-  for (const m of MAPS) { const l = store.get('sr_lb_' + m.id, []); l.forEach(e => { if (e.name === old) e.name = n; }); store.set('sr_lb_' + m.id, l); }
+  if (n === profile.name) return;
+  if (!validName(n)) return $('prof-err').textContent = NAME_HELP;
+  $('prof-err').textContent = 'Saving…';
+  if (profile.claimed) {
+    const r = await api('POST', { action: 'rename', old: profile.name, name: n, token: profile.token });
+    if (r.status === 409) return $('prof-err').textContent = 'That username is taken.';
+    if (!r.ok) return $('prof-err').textContent = 'Could not reach the server. Try again later.';
+  } else {
+    const old = profile.name; profile.name = n;
+    const r = await claimName(n);
+    if (r.status === 409) { profile.name = old; return $('prof-err').textContent = 'That username is taken.'; }
+  }
+  profile.name = n; saveProfile(); net.boards = {};
   $('prof-err').textContent = 'Saved.';
 };
 function syncSettings() { $('set-sound').textContent = 'SOUND: ' + (profile && profile.mute ? 'OFF' : 'ON') + '  [M]'; }
 $('set-sound').onclick = () => { profile.mute = !profile.mute; saveProfile(); syncSettings(); };
 $('set-reset').onclick = () => {
-  if (!confirm('Delete all your times on this device?')) return;
-  profile.pbs = {}; saveProfile(); for (const m of MAPS) store.set('sr_lb_' + m.id, []);
+  if (!confirm('Delete your personal bests on this device? (Global leaderboard times stay.)')) return;
+  profile.pbs = {}; saveProfile();
   $('set-reset').textContent = 'RECORDS CLEARED';
 };
 const esc = s => s.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
@@ -955,12 +1013,14 @@ const esc = s => s.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '
 // username
 $('name-ok').onclick = submitName;
 $('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') submitName(); });
-function submitName() {
+async function submitName() {
   const n = $('name-input').value.trim();
-  if (!validName(n)) return $('name-err').textContent = '3–16 characters: letters, numbers or _';
-  if (MOCK_NAMES.includes(n)) return $('name-err').textContent = 'That username is taken. Try another.';
-  profile = { name: n, hat: DEFAULT_HAT, kimono: DEFAULT_KIM, pbs: {}, mute: false };
-  saveProfile(); history = []; showScreen('menu');
+  if (!validName(n)) return $('name-err').textContent = NAME_HELP;
+  $('name-err').textContent = 'Checking…';
+  profile = { name: n, hat: DEFAULT_HAT, kimono: DEFAULT_KIM, pbs: {}, mute: false, token: newToken(), claimed: false };
+  const r = await claimName(n);
+  if (r.status === 409) { profile = null; return $('name-err').textContent = 'That username is taken. Try another.'; }
+  $('name-err').textContent = ''; saveProfile(); history = []; showScreen('menu');
 }
 
 // customization
@@ -998,7 +1058,15 @@ function drawPreview(dt) {
 
 // ---------- BOOT ------------------------------------------------------------
 resetPlayer(MAPS[0].start.x, MAPS[0].start.y); updCam(0, true);
-if (profile && profile.name) { profile.pbs = profile.pbs || {}; showScreen('menu'); }
+if (profile && profile.name) {
+  profile.pbs = profile.pbs || {};
+  if (!profile.token) { profile.token = newToken(); profile.claimed = false; saveProfile(); }
+  showScreen('menu');
+  if (!profile.claimed) claimName(profile.name).then(r => {
+    if (r.status === 409) { $('name-err').textContent = 'Your username was taken by another player. Pick a new one.'; profile = null; showScreen('name'); }
+  });
+  else loadBoard(MAPS[0].id);
+}
 else { showScreen('name'); setTimeout(() => $('name-input').focus(), 50); }
 requestAnimationFrame(frame);
 
